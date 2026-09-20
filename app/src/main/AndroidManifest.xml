@@ -153,6 +153,14 @@
             android:label="App Store"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- Fullscreen WebView shell for user-added web-app tiles (Manage mode →
+             "+ Web App"). Not exported: launched only by the launcher. -->
+        <activity
+            android:name=".WebAppActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density|uiMode"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- Full-screen photo frame: on-demand preview AND the permanent frame
              DreamPolicy relaunches when the system force-wakes the screensaver.
              Excluded from recents — it's ambient, not a task. -->

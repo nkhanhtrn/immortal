@@ -156,6 +156,9 @@ private data class AppEntry(
     val component: ComponentName,
     val icon: ImageBitmap,
     val folder: String? = null,
+    // Non-null for user-added web-app tiles (WebAppStore); launched in our
+    // fullscreen WebView instead of via the ComponentName.
+    val webUrl: String? = null,
 )
 
 private data class WidgetProviderEntry(
@@ -201,12 +204,27 @@ class HomeActivity : ComponentActivity() {
       SampleAppTheme(darkTheme = true) {
         LauncherScreen(
             onLaunch = { cn ->
-              runCatching {
-                startActivity(
-                    Intent(Intent.ACTION_MAIN)
-                        .addCategory(Intent.CATEGORY_LAUNCHER)
-                        .setComponent(cn)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+              // Web-app tiles route to our fullscreen WebView shell, not PackageManager.
+              val webApp =
+                  WebAppStore.idFromPackage(cn.packageName)?.let { id ->
+                    WebAppStore.load(this).firstOrNull { it.id == id }
+                  }
+              if (webApp != null) {
+                runCatching {
+                  startActivity(
+                      Intent(this, WebAppActivity::class.java)
+                          .putExtra(WebAppActivity.EXTRA_URL, webApp.url)
+                          .putExtra(WebAppActivity.EXTRA_LABEL, webApp.label)
+                          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } else {
+                runCatching {
+                  startActivity(
+                      Intent(Intent.ACTION_MAIN)
+                          .addCategory(Intent.CATEGORY_LAUNCHER)
+                          .setComponent(cn)
+                          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
               }
             },
             onOpenStore = {
@@ -222,12 +240,19 @@ class HomeActivity : ComponentActivity() {
             },
             onExitHome = { launchStockHome() },
             onUninstall = { pkg ->
-              // System uninstall dialog; no special permission needed.
-              runCatching {
-                startActivity(
-                    Intent(Intent.ACTION_DELETE)
-                        .setData(android.net.Uri.parse("package:$pkg"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+              // Web-app tiles are ours: drop them from the store immediately,
+              // no system uninstall dialog.
+              val webId = WebAppStore.idFromPackage(pkg)
+              if (webId != null) {
+                WebAppStore.remove(this, webId)
+              } else {
+                // System uninstall dialog; no special permission needed.
+                runCatching {
+                  startActivity(
+                      Intent(Intent.ACTION_DELETE)
+                          .setData(android.net.Uri.parse("package:$pkg"))
+                          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
               }
             },
         )
@@ -384,6 +409,12 @@ private fun LauncherScreen(
     else @Suppress("UnspecifiedRegisterReceiverFlag") context.registerReceiver(receiver, filter)
     onDispose { runCatching { context.unregisterReceiver(receiver) } }
   }
+  // Web-app store edits (added/removed from the Manage dialog) refresh the grid live too.
+  DisposableEffect(Unit) {
+    val webListener: () -> Unit = { reload++ }
+    WebAppStore.addListener(webListener)
+    onDispose { WebAppStore.removeListener(webListener) }
+  }
   val loadedApps by
       produceState<List<AppEntry>?>(initialValue = null, reload) {
         value = withContext(Dispatchers.IO) { loadApps(context) }
@@ -393,6 +424,7 @@ private fun LauncherScreen(
   var editMode by remember { mutableStateOf(false) }
   var openFolder by remember { mutableStateOf<String?>(null) }
   var showWidgetPicker by remember { mutableStateOf(false) }
+  var showWebAppDialog by remember { mutableStateOf(false) }
   var widgetStatus by remember { mutableStateOf<String?>(null) }
   var widgets by remember { mutableStateOf(HomeWidgetStore.load(context)) }
   // Whether the shared timer is currently ringing — drives the swipe-to-stop alarm overlay.
@@ -1145,6 +1177,7 @@ private fun LauncherScreen(
         modifier = Modifier.align(Alignment.BottomEnd).padding(end = 36.dp, bottom = 32.dp),
     ) {
       if (editMode) TidyButton { tidyGrid() }
+      if (editMode) AddWebAppButton { showWebAppDialog = true }
       if (editMode) AddWidgetButton { showWidgetPicker = true }
       EditButton(editMode = editMode, onClick = { editMode = !editMode })
     }
@@ -1243,6 +1276,16 @@ private fun LauncherScreen(
             renaming = null
           },
           onCancel = { renaming = null },
+      )
+    }
+
+    if (showWebAppDialog) {
+      WebAppAddDialog(
+          onAdd = { label, url ->
+            WebAppStore.add(context, label, url)
+            showWebAppDialog = false
+          },
+          onCancel = { showWebAppDialog = false },
       )
     }
 
@@ -2503,6 +2546,111 @@ private fun AddWidgetButton(onClick: () -> Unit) {
   }
 }
 
+/** Manage-mode affordance: add a web-app tile (name + address) to the home grid. */
+@Composable
+private fun AddWebAppButton(onClick: () -> Unit) {
+  Surface(
+      color = Color(0xFF2E7D32),
+      shape = RoundedCornerShape(30.dp),
+      modifier =
+          Modifier.width(156.dp).height(60.dp).tvFocusable(RoundedCornerShape(30.dp)) {
+            onClick()
+          },
+  ) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 20.dp),
+    ) {
+      Text("+", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Light)
+      Text("Web App", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    }
+  }
+}
+
+/** Modal form for adding a web-app tile; dark chrome to match the widget picker. */
+@Composable
+private fun WebAppAddDialog(onAdd: (String, String) -> Unit, onCancel: () -> Unit) {
+  var label by remember { mutableStateOf("") }
+  var url by remember { mutableStateOf("") }
+  val noRipple = remember { MutableInteractionSource() }
+  Box(
+      contentAlignment = Alignment.Center,
+      modifier =
+          Modifier.fillMaxSize()
+              .background(Color(0xB3000000))
+              .clickable(interactionSource = noRipple, indication = null) { onCancel() },
+  ) {
+    Surface(
+        color = Color(0xFF202028),
+        shape = RoundedCornerShape(24.dp),
+        modifier =
+            Modifier.width(560.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null) {},
+    ) {
+      Column(Modifier.padding(30.dp)) {
+        Text(
+            "Add a web app",
+            color = Color.White,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold)
+        Text(
+            "A tile on the home grid that opens the site fullscreen.",
+            color = Color(0xFFBFBFBF),
+            fontSize = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, bottom = 18.dp))
+        androidx.compose.material3.OutlinedTextField(
+            value = label,
+            onValueChange = { label = it },
+            label = { Text("Name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.size(12.dp))
+        androidx.compose.material3.OutlinedTextField(
+            value = url,
+            onValueChange = { url = it },
+            label = { Text("Address (example.com or https://…)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.size(22.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.align(Alignment.End)) {
+          val canAdd = label.isNotBlank() && url.isNotBlank()
+          Surface(
+              color = Color(0x33FFFFFF),
+              shape = RoundedCornerShape(24.dp),
+              modifier =
+                  Modifier.width(110.dp)
+                      .height(52.dp)
+                      .tvFocusable(RoundedCornerShape(24.dp)) { onCancel() }) {
+                Box(contentAlignment = Alignment.Center) {
+                  Text("Cancel", color = Color(0xFFE8E8E8), fontSize = 16.sp)
+                }
+          }
+          Surface(
+              color = if (canAdd) Color(0xFF5B6BC0) else Color(0x22FFFFFF),
+              shape = RoundedCornerShape(24.dp),
+              modifier =
+                  Modifier.width(110.dp)
+                      .height(52.dp)
+                      .tvFocusable(RoundedCornerShape(24.dp)) { if (canAdd) onAdd(label, url) }) {
+                Box(contentAlignment = Alignment.Center) {
+                  Text(
+                      "Add",
+                      color = Color.White,
+                      fontSize = 16.sp,
+                      fontWeight = FontWeight.SemiBold)
+                }
+          }
+        }
+      }
+    }
+  }
+}
+
 @Composable
 private fun WidgetTile(
     widget: HomeWidgetStore.HomeWidget,
@@ -3332,7 +3480,7 @@ private fun AppTile(
 private fun loadApps(context: Context): List<AppEntry> {
   val pm = context.packageManager
   val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-  return pm.queryIntentActivities(intent, 0)
+  val apps = pm.queryIntentActivities(intent, 0)
       .filter {
         val pkg = it.activityInfo.packageName
         pkg != context.packageName && !Curation.isHidden(pkg, "")
@@ -3358,6 +3506,48 @@ private fun loadApps(context: Context): List<AppEntry> {
       // debug/launcher activity that would otherwise show as a duplicate.
       .distinctBy { it.component.packageName }
       .sortedBy { it.label.lowercase(Locale.getDefault()) }
+
+  // User-added web apps: synthetic tiles with a monogram icon, launched fullscreen
+  // in WebAppActivity. Appended after the native apps (drag them anywhere in Manage
+  // mode); folder assignments work via the synthetic package id like any app.
+  val webApps =
+      WebAppStore.load(context).mapNotNull { wa ->
+        runCatching {
+              AppEntry(
+                  label = wa.label,
+                  component =
+                      ComponentName(WebAppStore.PKG_PREFIX + wa.id, WebAppStore.PKG_PREFIX + wa.id),
+                  icon = monogramBitmap(wa.label, 144).asImageBitmap(),
+                  webUrl = wa.url)
+            }
+            .getOrNull()
+      }
+  return apps + webApps
+}
+
+/** Monogram tile icon for web apps: hue derived from the label, white initial. */
+private fun monogramBitmap(label: String, sizePx: Int): Bitmap {
+  val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+  val canvas = android.graphics.Canvas(bmp)
+  val hue = (((label.hashCode() % 360) + 360) % 360).toFloat()
+  val bg =
+      android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.45f, 0.42f))
+      }
+  val radius = sizePx * 0.22f
+  canvas.drawRoundRect(0f, 0f, sizePx.toFloat(), sizePx.toFloat(), radius, radius, bg)
+  val letter =
+      label.trim().firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "?"
+  val fg =
+      android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textSize = sizePx * 0.5f
+        textAlign = android.graphics.Paint.Align.CENTER
+        isFakeBoldText = true
+      }
+  val y = sizePx / 2f - (fg.descent() + fg.ascent()) / 2f
+  canvas.drawText(letter, sizePx / 2f, y, fg)
+  return bmp
 }
 
 private fun loadWidgetProviders(context: Context, tileDp: Dp): List<WidgetProviderEntry> {
