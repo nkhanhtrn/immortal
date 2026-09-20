@@ -32,8 +32,8 @@ android {
     applicationId = "com.immortal.launcher"
     minSdk = 24
     targetSdk = 36
-    versionCode = 67
-    versionName = "1.73"
+    versionCode = 69
+    versionName = "1.73-webtiles.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -76,7 +76,10 @@ android {
     }
     debug {
       // Lets a debug build install alongside a provisioned release for testing.
-      applicationIdSuffix = ".debug"
+      // FORK OVERRIDE: this branch deploys in-place over a debug-signed build under the
+      // real applicationId (self-update installs must match package + signature), so the
+      // parallel-install suffix is disabled here. Do not carry into an upstream PR.
+      // applicationIdSuffix = ".debug"
     }
     // Release-faithful iteration build. Same applicationId + same signing key + minify off
     // (inherited from release via initWith), so it provisions identically — home role, device

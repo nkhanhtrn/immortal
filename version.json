@@ -1,6 +1,6 @@
 {
-  "versionCode": 67,
-  "versionName": "1.73",
-  "apkUrl": "https://github.com/starbrightlab/immortal/releases/latest/download/immortal.apk",
-  "notes": "The camera stream now recovers on its own when another app takes the camera, and the on-screen badge is gone \u2014 the Portal's own camera light is the indicator. Removes the snapshot button, which couldn't produce an image small enough for MQTT and interrupted the live stream."
+  "versionCode": 69,
+  "versionName": "1.73-webtiles.1",
+  "apkUrl": "https://github.com/nkhanhtrn/immortal/releases/latest/download/immortal.apk",
+  "notes": "Web-app tiles: add any site or PWA to the home grid from Manage mode (+ Web App). Tiles open fullscreen in the Portal's own WebView, drag into folders, and delete instantly with the Manage \u2715. Fork build \u2014 debug-signed."
 }
