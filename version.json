@@ -2,5 +2,5 @@
   "versionCode": 71,
   "versionName": "1.74-webtiles.1",
   "apkUrl": "https://github.com/nkhanhtrn/immortal/releases/latest/download/immortal.apk",
-  "notes": "Rebased on upstream 1.74: the screensaver cache fills once with a random pool and rotates slowly (new Swap per refresh and Refresh from server every settings), world clocks can search any city and be renamed, TV remote buttons are remappable, MQTT work is off the main thread. Plus web-app tiles: add any site or PWA to the home grid from Manage mode (+ Web App). Fork build \u2014 debug-signed."
+  "notes": "Upstream 1.74: the screensaver cache fills once with a random pool and rotates slowly (new Swap per refresh and Refresh from server every settings), world clocks search any city and can be renamed, TV remote buttons are remappable, MQTT work moved off the main thread. Plus web-app tiles: add any site or PWA to the home grid from Manage mode (+ Web App). Builds are release-faithful (non-debuggable) with allowBackup off."
 }

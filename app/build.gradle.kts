@@ -81,6 +81,16 @@ android {
       // parallel-install suffix is disabled here. Do not carry into an upstream PR.
       // applicationIdSuffix = ".debug"
     }
+    // Fork deployment build: release-faithful (NOT debuggable) but debug-signed, so
+    // it self-updates in place over the builds this fork ships while keeping run-as/
+    // debug-attach closed. Release's missing-keystore guard does not apply (assemble-
+    // Deploy is not a Release task) and signing is pinned explicitly below.
+    create("deploy") {
+      initWith(getByName("release"))
+      isDebuggable = false
+      matchingFallbacks += "release"
+      signingConfig = signingConfigs.getByName("debug")
+    }
     // Release-faithful iteration build. Same applicationId + same signing key + minify off
     // (inherited from release via initWith), so it provisions identically — home role, device
     // admin, and self-update signature checks all behave exactly as on a release build. The ONLY
