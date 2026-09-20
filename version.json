@@ -1,6 +1,6 @@
 {
-  "versionCode": 69,
-  "versionName": "1.73-webtiles.1",
+  "versionCode": 70,
+  "versionName": "1.73-webtiles.2",
   "apkUrl": "https://github.com/nkhanhtrn/immortal/releases/latest/download/immortal.apk",
-  "notes": "Web-app tiles: add any site or PWA to the home grid from Manage mode (+ Web App). Tiles open fullscreen in the Portal's own WebView, drag into folders, and delete instantly with the Manage \u2715. Fork build \u2014 debug-signed."
+  "notes": "Hardening: builds are now release-faithful (non-debuggable) and allowBackup is off. Same web-app tiles as before."
 }

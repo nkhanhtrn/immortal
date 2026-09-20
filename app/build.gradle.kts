@@ -32,8 +32,8 @@ android {
     applicationId = "com.immortal.launcher"
     minSdk = 24
     targetSdk = 36
-    versionCode = 69
-    versionName = "1.73-webtiles.1"
+    versionCode = 70
+    versionName = "1.73-webtiles.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -80,6 +80,16 @@ android {
       // real applicationId (self-update installs must match package + signature), so the
       // parallel-install suffix is disabled here. Do not carry into an upstream PR.
       // applicationIdSuffix = ".debug"
+    }
+    // Fork deployment build: release-faithful (NOT debuggable) but debug-signed, so
+    // it self-updates in place over the builds this fork ships while keeping run-as/
+    // debug-attach closed. Release's missing-keystore guard does not apply (assemble-
+    // Deploy is not a Release task) and signing is pinned explicitly below.
+    create("deploy") {
+      initWith(getByName("release"))
+      isDebuggable = false
+      matchingFallbacks += "release"
+      signingConfig = signingConfigs.getByName("debug")
     }
     // Release-faithful iteration build. Same applicationId + same signing key + minify off
     // (inherited from release via initWith), so it provisions identically — home role, device
