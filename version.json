@@ -1,6 +1,6 @@
 {
-  "versionCode": 68,
-  "versionName": "1.74",
-  "apkUrl": "https://github.com/starbrightlab/immortal/releases/latest/download/immortal.apk",
-  "notes": "The Immich and WebDAV screensaver cache now fills with a random selection of your album and only swaps a small share on a slow schedule, instead of re-downloading constantly. New settings: Swap per refresh (default 5%) and Refresh from server every (default 1 day). The frame keeps playing from storage when the server is down."
+  "versionCode": 71,
+  "versionName": "1.74-webtiles.1",
+  "apkUrl": "https://github.com/nkhanhtrn/immortal/releases/latest/download/immortal.apk",
+  "notes": "Rebased on upstream 1.74: the screensaver cache fills once with a random pool and rotates slowly (new Swap per refresh and Refresh from server every settings), world clocks can search any city and be renamed, TV remote buttons are remappable, MQTT work is off the main thread. Plus web-app tiles: add any site or PWA to the home grid from Manage mode (+ Web App). Fork build \u2014 debug-signed."
 }
